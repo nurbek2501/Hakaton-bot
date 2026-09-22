@@ -1,0 +1,17 @@
+# Maxfiy sozlamalar (bot tokeni) - HECH QACHON repoga qo‘shilmasin
+.env
+
+# SQLite baza - ishtirokchilarning shaxsiy ma’lumotlari
+bot.db
+bot.db-journal
+bot.db-wal
+bot.db-shm
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Log va vaqtinchalik fayllar
+*.log
