@@ -14,6 +14,7 @@ Javoblar forma ulangan **Google Sheets** jadvaliga o‘zi tushadi.
 | `excel_export.py` | Barcha anketalarni bitta Excel faylga yig‘ish (`/export`) |
 | `form_check.py` | Google Forma bot savollariga mosligini tekshirish (`/checkform`) |
 | `set_webhook.py` | Webhookni o‘rnatish (bir marta ishga tushiriladi) |
+| `deploy_pa.py` | PythonAnywhere’ga bitta buyruq bilan joylash va yangilash |
 | `run_local.py` | Faqat lokal kompyuterda sinash uchun (polling) |
 | `.env.example` | Sozlamalar namunasi |
 
@@ -40,6 +41,26 @@ Javoblar forma ulangan **Google Sheets** jadvaliga o‘zi tushadi.
 
 Buyruqlar: `/start`, `/restart`, `/cancel`, `/help`. Admin buyruqlari faqat adminlar menyusida
 ko‘rinadi; boshqalar yozsa, bot «Bunday buyruq yo‘q» deydi.
+
+---
+
+## ⚡ Tezkor joylash (3 qadam)
+
+1. **@BotFather** dan bot tokenini oling va [pythonanywhere.com](https://www.pythonanywhere.com)’da
+   bepul (Beginner) akkaunt oching.
+2. Brauzerda: **Web → Add a new web app → Next → Manual configuration → Python 3.10 → Next**.
+3. **Consoles → Bash** ni oching va yozing:
+   ```bash
+   git clone https://github.com/nurbek2501/Hakaton-bot.git ~/xakaton_bot
+   python3.10 ~/xakaton_bot/deploy_pa.py
+   ```
+   Skript bot tokenini (yozganda ekranda ko‘rinmaydi) va admin Telegram ID’ni so‘raydi.
+   Qolganini o‘zi qiladi: kutubxonalar, `.env`, WSGI, qayta ishga tushirish, webhook,
+   Google Forma tekshiruvi.
+
+Kod yangilansa: `cd ~/xakaton_bot && git pull && python3.10 deploy_pa.py` (sozlamalar saqlanadi).
+
+Hammasini qo‘lda qilmoqchi bo‘lsangiz — quyidagi bosqichma-bosqich qo‘llanma.
 
 ---
 
