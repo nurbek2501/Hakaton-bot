@@ -35,6 +35,7 @@ Javoblar forma ulangan **Google Sheets** jadvaliga o‘zi tushadi.
 - Yakunda javoblar xulosasi → «✅ Tasdiqlash va yuborish» / «✏️ Qaytadan to‘ldirish»
 - Xatolik bo‘lsa javoblar saqlanadi va «🔁 Qayta yuborish» tugmasi chiqadi
 - Bot qayta ishga tushsa ham foydalanuvchi qolgan joyidan davom etadi (SQLite)
+- Ro‘yxatga olish muddati: qolgan vaqt doim ko‘rinib turadi, muddatdan keyin qabul yopiladi
 - Admin uchun (faqat ADMIN_IDS dagilar): `/stats` — statistika, `/export` — barcha anketalar
   bitta **Excel** faylda, `/checkform` — Google Forma tekshiruvi, `/resend` — yuborilmay
   qolganlarni qayta yuborish
@@ -260,6 +261,32 @@ tayyor `.xlsx` fayl oladi:
 
 `/export` ishlashi uchun `.env` da `KEEP_LOCAL_COPY=1` bo‘lishi kerak. U yoqilishidan oldin
 yuborilgan anketalar faylga tushmaydi (ular faqat Google Sheets’da bo‘ladi).
+
+---
+
+## 📅 Ro‘yxatga olish muddati
+
+Oxirgi muddat: **27-sentabr 2026, 23:59** (Toshkent vaqti) — `questions.py` dagi `REG_DEADLINE`.
+
+- Bot e’londa, har bir savol tepasida va xulosada **qancha vaqt qolganini** ko‘rsatib turadi:
+  `⏳ Qabul tugashiga: 2 kun 6 soat` (oxirgi sutkada ⏰, oxirgi soatda 🔥).
+- **Muddatdan keyin:** yangi anketa boshlanmaydi, to‘ldirilayotgan anketalar yopiladi
+  («⏰ Ro‘yxatdan o‘tish yakunlandi»). Javoblar o‘chirilmaydi — muddat uzaytirilsa, davom ettirish mumkin.
+- Muddat ichida yuborilib, texnik sabab bilan qolib ketgan anketalar keyin ham qayta yuboriladi
+  («🔁 Qayta yuborish», `/resend`). Admin buyruqlari (`/stats`, `/export`) ishlayveradi.
+- Vaqt adolatli hisoblanadi: xabarning **yozilgan payti** (Telegram vaqti) olinadi, server
+  navbatidagi kechikish emas. «Yuborish» tugmasiga kechikish uchun 2 daqiqa beriladi.
+
+**Muddatni kodga tegmasdan o‘zgartirish** (PythonAnywhere Bash konsolida):
+```bash
+echo "REG_DEADLINE=2026-10-05 23:59" >> ~/xakaton_bot/.env
+touch /var/www/nurbek2501_pythonanywhere_com_wsgi.py
+```
+Ikkinchi qator web-ilovani qayta yuklaydi. Muddatsiz ishlatish: `REG_DEADLINE=off`.
+Tekshirish: `https://nurbek2501.pythonanywhere.com` sahifasida muddat va qolgan vaqt ko‘rinadi.
+
+💡 Muddat tugaganda Google Formada ham **«Javoblarni qabul qilish»** ni o‘chiring — repo ochiq,
+Forma manzilini ko‘rgan kishi botni chetlab yubora olmasin.
 
 ---
 

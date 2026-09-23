@@ -10,7 +10,7 @@ import os
 import re
 import time
 from collections import Counter, deque
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from dotenv import load_dotenv
 
@@ -27,7 +27,7 @@ import storage as st  # noqa: E402
 from excel_export import build_xlsx  # noqa: E402
 from form_check import check_form, report_text  # noqa: E402
 from form_submit import submit  # noqa: E402
-from questions import OTHER, QUESTIONS, TEAM, is_applicable  # noqa: E402
+from questions import OTHER, QUESTIONS, REG_DEADLINE, TEAM, is_applicable  # noqa: E402
 
 # ------------------------------------------------------------------
 # Sozlamalar (.env dan)
@@ -60,6 +60,90 @@ telebot.logger.handlers.clear()
 log = logging.getLogger("xakaton_bot")
 if not ADMIN_IDS:
     log.warning("ADMIN_IDS bo‘sh — /export, /stats va boshqa admin buyruqlari hech kimga ishlamaydi")
+
+
+# ------------------------------------------------------------------
+# Ro‘yxatga olish muddati
+# ------------------------------------------------------------------
+UZ_MONTHS = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust",
+             "sentabr", "oktabr", "noyabr", "dekabr"]
+# Foydalanuvchi «Yuborish» ni muddat ichida bossa-yu, server navbati tufayli sal kechroq
+# ishlansa - rad etilmasligi uchun (tugma bosilgan vaqtni Telegram bermaydi)
+SEND_LAG_GRACE = timedelta(minutes=2)
+
+
+def _parse_deadline(raw):
+    """«2026-09-27 23:59» yoki «27.09.2026 23:59» -> qabul yopiladigan payt (shu daqiqa oxiri).
+    «off» - muddatsiz. Noto‘g‘ri yozilgan bo‘lsa - log’da xato va muddatsiz ishlaydi."""
+    raw = (raw or "").strip()
+    if raw.lower() in ("off", "none", "0"):
+        return None
+    for fmt in ("%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M"):
+        try:
+            return datetime.strptime(raw, fmt).replace(tzinfo=st.TZ) + timedelta(minutes=1)
+        except ValueError:
+            pass
+    log.error("REG_DEADLINE noto‘g‘ri: %r (kutilgan ko‘rinish: 2026-09-27 23:59) — muddat qo‘yilmadi", raw)
+    return None
+
+
+# .env dagi REG_DEADLINE ustun turadi, bo‘lmasa - questions.py dagi qiymat
+DEADLINE_END = _parse_deadline(os.getenv("REG_DEADLINE") or REG_DEADLINE)
+
+
+def _now():
+    return datetime.now(st.TZ)
+
+
+def deadline_label():
+    """«27-sentabr, 23:59»"""
+    d = DEADLINE_END - timedelta(minutes=1)
+    return f"{d.day}-{UZ_MONTHS[d.month - 1]}, {d:%H:%M}"
+
+
+def registration_open(at=None):
+    """Ro‘yxatga olish ochiqmi. at - foydalanuvchi harakat qilgan payt
+    (datetime yoki Telegram xabaridagi unix vaqt); None - hozir."""
+    if DEADLINE_END is None:
+        return True
+    if at is None:
+        at = _now()
+    elif isinstance(at, (int, float)):
+        at = datetime.fromtimestamp(at, st.TZ)
+    return at < DEADLINE_END
+
+
+def time_left():
+    """Qolgan vaqt, masalan «4 kun 18 soat». Muddat yo‘q yoki tugagan bo‘lsa - None."""
+    if DEADLINE_END is None:
+        return None
+    sec = (DEADLINE_END - _now()).total_seconds()
+    if sec <= 0:
+        return None
+    days, rest = divmod(int(sec // 60), 1440)
+    hours, mins = divmod(rest, 60)
+    if days:
+        return f"{days} kun {hours} soat" if hours else f"{days} kun"
+    if hours:
+        return f"{hours} soat {mins} daqiqa" if mins else f"{hours} soat"
+    return f"{mins} daqiqa" if mins else "1 daqiqadan kam"
+
+
+def countdown_line():
+    """«⏳ Qabul tugashiga: 4 kun 18 soat» (oxirgi sutkada ⏰, oxirgi soatda 🔥)."""
+    left = time_left()
+    if not left:
+        return ""
+    sec = (DEADLINE_END - _now()).total_seconds()
+    icon = "⏳" if sec >= 86400 else "⏰" if sec >= 3600 else "🔥"
+    return f"{icon} Qabul tugashiga: <b>{left}</b>"
+
+
+def closed_text():
+    return ("⏰ <b>Ro‘yxatdan o‘tish yakunlandi.</b>\n\n"
+            f"Oxirgi muddat {deadline_label()} edi — shundan keyin anketalar qabul qilinmaydi.\n\n"
+            "Qiziqishingiz uchun rahmat! 📢 Natijalarni «Yangi Xatirchi» Telegram kanalida "
+            "kuzatib boring.")
 
 # PythonAnywhere bepul tarifida Telegram API ga faqat proxy orqali chiqiladi
 if USE_PROXY:
@@ -184,6 +268,19 @@ ADMIN_HELP = (
 ADMIN_COMMANDS = {"/stats", "/export", "/checkform", "/resend"}
 
 AGE_STOP = "Afsuski, tanlovda 17 yoshdan 30 yoshgacha bo‘lgan yoshlar ishtirok eta oladi."
+
+
+def announce_text():
+    """E’lon + oxirgi muddat va qancha vaqt qolgani."""
+    if DEADLINE_END is None:
+        return ANNOUNCE
+    if registration_open():
+        return f"{ANNOUNCE}\n\n📅 <b>Oxirgi muddat:</b> {deadline_label()}\n{countdown_line()}"
+    return f"{ANNOUNCE}\n\n⏰ <b>Ro‘yxatdan o‘tish yakunlandi</b> ({deadline_label()})."
+
+
+def send_closed(chat_id):
+    bot.send_message(chat_id, closed_text(), reply_markup=types.ReplyKeyboardRemove())
 
 
 def esc(s):
@@ -332,8 +429,10 @@ def _send_question(chat_id, s, user):
     pos, total = progress(i, a)
     first = prev_index(i, a) is None
 
-    text = (f"📋 <b>Savol {pos}/{total}</b>   {progress_bar(pos, total)}\n\n"
-            f"{q['icon']} <b>{esc(q['text'])}</b>")
+    cd = countdown_line()  # «⏳ Qabul tugashiga: 4 kun 18 soat»
+    text = (f"📋 <b>Savol {pos}/{total}</b>   {progress_bar(pos, total)}\n"
+            + (f"{cd}\n" if cd else "")
+            + f"\n{q['icon']} <b>{esc(q['text'])}</b>")
     if not q["required"]:
         text += "\n<i>(ixtiyoriy savol)</i>"
 
@@ -364,14 +463,19 @@ def _send_question(chat_id, s, user):
 
 
 def start_filling(chat_id, user):
+    if not registration_open():  # muddat tugagan - yangi anketa boshlanmaydi
+        send_closed(chat_id)
+        return
     s = {"user_id": user.id, "status": st.FILLING, "step": 0, "sub": None, "answers": {},
          "shown": -1, "asked_id": 0}
     st.save_session(s)
+    cd = countdown_line()
     bot.send_message(
         chat_id,
         f"✨ Ajoyib, {esc(user.first_name or 'do‘stim')}! Boshladik.\n\n"
         "Savollarga birma-bir javob bering. Istalgan payt <b>⬅️ Orqaga</b> "
-        "tugmasi bilan oldingi savolga qaytishingiz mumkin.",
+        "tugmasi bilan oldingi savolga qaytishingiz mumkin."
+        + (f"\n\n{cd} (oxirgi muddat: {deadline_label()})" if cd else ""),
     )
     ask(chat_id, s, user)
 
@@ -833,7 +937,8 @@ def review_text(answers):
         if is_applicable(q, answers):
             parts.append(f"{q['icon']} <b>{esc(short_title(q))}</b>\n"
                          f"{esc(display_value(q, answers, limit=None if q.get('full') else 150))}")
-    parts.append("Hammasi to‘g‘rimi? 👇")
+    cd = countdown_line()
+    parts.append((f"{cd} — shu vaqt ichida yuboring.\n" if cd else "") + "Hammasi to‘g‘rimi? 👇")
     return parts
 
 
@@ -1007,23 +1112,28 @@ def cmd_start(m):
     s = st.get_session(m.from_user.id)
     status = s["status"]
     log.info("/start: user=%s holat=%s", m.from_user.id, status)
-    if status == st.FILLING and (s["step"] > 0 or s["answers"]):
-        kb = ikb([("▶️ Davom ettirish", "resume")], [("🔄 Boshidan boshlash", "restart")])
-        note = "\n\n📝 Sizda to‘ldirilmagan anketa bor. Davom ettirasizmi?"
-    elif status == st.REVIEW:
-        kb = ikb([("▶️ Anketani ko‘rish", "resume")], [("🔄 Boshidan boshlash", "restart")])
-        note = "\n\n📝 Anketangiz tayyor, faqat tasdiqlash qoldi."
-    elif status == st.FAILED:
+    if status == st.FAILED:
+        # Muddat ichida yuborilgan, lekin texnik sabab bilan qolib ketgan - muddatdan keyin ham
+        # qayta yuborish mumkin
         kb = ikb([("🔁 Qayta yuborish", "send")])
         note = "\n\n⚠️ Anketangiz hali yuborilmagan. Qayta urinib ko‘ring."
     elif status == st.SENDING:
         # Aynan hozir yuborilmoqda - «qayta yuborish» tugmasi dublikat qator yaratardi
         kb = None
         note = "\n\n⏳ Anketangiz hozir yuborilmoqda — natija haqida xabar keladi."
+    elif not registration_open():
+        kb = None  # muddat tugagan - ro‘yxatdan o‘tish tugmasi yo‘q
+        note = "\n\n✅ Siz ro‘yxatdan o‘tgansiz." if st.has_submitted(m.from_user.id) else ""
+    elif status == st.FILLING and (s["step"] > 0 or s["answers"]):
+        kb = ikb([("▶️ Davom ettirish", "resume")], [("🔄 Boshidan boshlash", "restart")])
+        note = "\n\n📝 Sizda to‘ldirilmagan anketa bor. Davom ettirasizmi?"
+    elif status == st.REVIEW:
+        kb = ikb([("▶️ Anketani ko‘rish", "resume")], [("🔄 Boshidan boshlash", "restart")])
+        note = "\n\n📝 Anketangiz tayyor, faqat tasdiqlash qoldi."
     else:
         kb = ikb([("📝 Ro‘yxatdan o‘tish", "reg")])
         note = ""
-    bot.send_message(m.chat.id, ANNOUNCE + note, reply_markup=kb)
+    bot.send_message(m.chat.id, announce_text() + note, reply_markup=kb)
 
 
 @bot.message_handler(commands=["help"], func=private_only)
@@ -1046,6 +1156,9 @@ def cmd_restart(m):
 
 
 def begin_registration(chat_id, user):
+    if not registration_open():
+        send_closed(chat_id)
+        return
     if st.has_submitted(user.id):
         st.reset_session(user.id)
         bot.send_message(
@@ -1069,13 +1182,18 @@ def cmd_stats(m):
     rows = [[("📥 Excel yuklab olish", "adm:export")], [("🔍 Formani tekshirish", "adm:check")]]
     if x["failed"]:
         rows.append([(f"🔁 Qayta yuborish ({x['failed']} ta)", "adm:resend")])
+    deadline = ""
+    if DEADLINE_END is not None:
+        left = time_left()
+        deadline = f"\n\n📅 Muddat: {deadline_label()} — " + (
+            f"<b>{left}</b> qoldi" if left else "<b>yakunlangan</b>")
     bot.send_message(
         m.chat.id,
         "📊 <b>Statistika</b>\n\n"
         f"✅ Yuborilgan anketalar: <b>{x['total']}</b>\n"
         f"👤 Noyob ishtirokchilar: <b>{x['users']}</b>\n"
         f"✍️ Hozir to‘ldirayotganlar: <b>{x['filling']}</b>\n"
-        f"⚠️ Yuborilmay qolganlar: <b>{x['failed']}</b>",
+        f"⚠️ Yuborilmay qolganlar: <b>{x['failed']}</b>" + deadline,
         reply_markup=ikb(*rows),
     )
 
@@ -1170,6 +1288,13 @@ def on_callback(c):
         handle_admin_callback(c, data)
         return
 
+    # Muddat tugagan: anketa boshlash va to‘ldirish yopiq («Yuborish» pastda alohida tekshiriladi)
+    if data not in ("send", "again:no") and not registration_open():
+        bot.answer_callback_query(c.id, "⏰ Ro‘yxatdan o‘tish yakunlandi", show_alert=True)
+        drop_markup(c)
+        send_closed(chat_id)
+        return
+
     if data == "reg":
         bot.answer_callback_query(c.id)
         if s["status"] in (st.FILLING, st.REVIEW) and (s["step"] > 0 or s["answers"]):
@@ -1208,6 +1333,13 @@ def on_callback(c):
         if s["status"] not in (st.REVIEW, st.FAILED):
             bot.answer_callback_query(c.id, "Bu tugma endi faol emas.")
             drop_markup(c)
+            return
+        # Yangi anketa muddatdan keyin yuborilmaydi. FAILED - muddat ichida yuborilgan, lekin
+        # texnik sabab bilan qolib ketgan: uni qayta yuborishga ruxsat beriladi
+        if s["status"] == st.REVIEW and not registration_open(_now() - SEND_LAG_GRACE):
+            bot.answer_callback_query(c.id, "⏰ Ro‘yxatdan o‘tish yakunlandi", show_alert=True)
+            drop_markup(c)
+            send_closed(chat_id)
             return
         bot.answer_callback_query(c.id, "⏳ Yuborilmoqda…")
         drop_markup(c)
@@ -1274,7 +1406,12 @@ def on_message(m):
     # Javob matni log’ga yozilmaydi (shaxsiy ma’lumot) - faqat qaysi savolga kelgani
     log.info("xabar: user=%s holat=%s savol=%s turi=%s", m.from_user.id, s["status"],
              s["step"] + 1, m.content_type)
-    if s["status"] == st.FILLING:
+    if s["status"] in (st.FILLING, st.REVIEW) and not registration_open(m.date):
+        # Xabar muddat tugagandan keyin yozilgan (vaqt - Telegram’dagi yozilgan payti,
+        # server navbatidagi kechikish hisobga olinmaydi). Javoblar o‘chirilmaydi:
+        # muddat uzaytirilsa, foydalanuvchi davom ettira oladi
+        send_closed(m.chat.id)
+    elif s["status"] == st.FILLING:
         handle_answer(m, s)
     elif s["status"] == st.REVIEW:
         if m.message_id < s["asked_id"]:
@@ -1288,11 +1425,16 @@ def on_message(m):
                          reply_markup=ikb([("🔁 Qayta yuborish", "send")]))
     elif st.has_submitted(m.from_user.id):
         bot.send_message(m.chat.id, "✅ Siz tanlovga ro‘yxatdan o‘tgansiz. Yangiliklarni «Yangi "
-                                    "Xatirchi» Telegram kanalida kuzatib boring.\n\n"
-                                    "Yana bir loyiha yubormoqchi bo‘lsangiz — /restart",
+                                    "Xatirchi» Telegram kanalida kuzatib boring."
+                         + ("\n\nYana bir loyiha yubormoqchi bo‘lsangiz — /restart"
+                            if registration_open() else ""),
                          reply_markup=success_keyboard())
+    elif not registration_open():
+        send_closed(m.chat.id)
     else:
-        bot.send_message(m.chat.id, "👋 Tanlovda ishtirok etish uchun ro‘yxatdan o‘ting 👇",
+        cd = countdown_line()
+        bot.send_message(m.chat.id, "👋 Tanlovda ishtirok etish uchun ro‘yxatdan o‘ting 👇"
+                         + (f"\n\n{cd}" if cd else ""),
                          reply_markup=ikb([("📝 Ro‘yxatdan o‘tish", "reg")]))
 
 
@@ -1317,7 +1459,11 @@ def on_bot_added(u):
 # ------------------------------------------------------------------
 @app.route("/")
 def index():
-    return "Xakaton bot ishlayapti ✅"
+    if DEADLINE_END is None:
+        return "Xakaton bot ishlayapti ✅"
+    left = time_left()
+    state = f"qabul ochiq, {left} qoldi" if left else "qabul yakunlangan"
+    return f"Xakaton bot ishlayapti ✅ · Ro‘yxatga olish: {deadline_label()} gacha ({state})"
 
 
 _recent = {}

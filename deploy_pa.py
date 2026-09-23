@@ -112,6 +112,11 @@ def write_env(env):
     lines = ["# deploy_pa.py tomonidan yozilgan. Bu faylni hech kimga bermang!", ""]
     for key, comment in ENV_KEYS:
         lines += [f"# {comment}", f"{key}={env.get(key, '')}", ""]
+    # Qo‘lda qo‘shilgan boshqa sozlamalar (masalan REG_DEADLINE) ham saqlanadi
+    known = {k for k, _ in ENV_KEYS}
+    extra = [k for k in env if k not in known]
+    if extra:
+        lines += ["# Qo‘shimcha sozlamalar"] + [f"{k}={env[k]}" for k in extra] + [""]
     with open(ENV_PATH, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
     try:
