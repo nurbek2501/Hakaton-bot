@@ -229,7 +229,8 @@ def main():
     say("\n" + "=" * 50)
     say(f"🎉 Tayyor! Botni sinab ko‘ring: https://t.me/{bot_username}")
     say("=" * 50)
-    say("• Har 3 oyda: Web sahifasida «Run until 3 months from today» ni bosing.")
+    say("• Har oy: Web sahifasida «Run until 1 month from today» "
+        "(«Bugundan boshlab 1 oygacha amal qiladi») ni bosing.")
     say("• Kod yangilansa: cd ~/xakaton_bot && git pull && python3.10 deploy_pa.py")
 
 

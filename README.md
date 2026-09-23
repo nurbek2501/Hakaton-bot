@@ -195,10 +195,10 @@ Skript bot menyusidagi buyruqlar va tavsifni ham o‘rnatadi.
 3. Google Formaga ulangan **Google Sheets** jadvalini oching — yangi qator paydo bo‘lishi kerak.
 4. Sinov qatorini jadvaldan o‘chirib qo‘yishni unutmang.
 
-### 11. ⚠️ Har 3 oyda muddatni uzaytirish
-Bepul web-ilova **3 oydan keyin o‘chib qoladi**. Buning oldini olish uchun
-**Web** bo‘limida **«Run until 3 months from today»** tugmasini bosib turing
-(PythonAnywhere muddat tugashidan oldin e-mail orqali eslatadi).
+### 11. ⚠️ Har oy muddatni uzaytirish
+Bepul web-ilova **1 oydan keyin o‘chib qoladi**. Buning oldini olish uchun oyiga bir marta
+**Web** bo‘limida **«Run until 1 month from today»** («Bugundan boshlab 1 oygacha amal qiladi»)
+tugmasini bosing. PythonAnywhere o‘chirishdan bir hafta oldin e-mail orqali eslatadi.
 
 ### 12. Xatolarni qayerdan ko‘rish mumkin
 **Web** bo‘limining pastida *Log files*:
