@@ -73,7 +73,7 @@ SEND_LAG_GRACE = timedelta(minutes=2)
 
 
 def _parse_deadline(raw):
-    """«2026-09-27 23:59» yoki «27.09.2026 23:59» -> qabul yopiladigan payt (shu daqiqa oxiri).
+    """«2026-09-28 23:59» yoki «28.09.2026 23:59» -> qabul yopiladigan payt (shu daqiqa oxiri).
     «off» - muddatsiz. Noto‘g‘ri yozilgan bo‘lsa - log’da xato va muddatsiz ishlaydi."""
     raw = (raw or "").strip()
     if raw.lower() in ("off", "none", "0"):
@@ -83,7 +83,7 @@ def _parse_deadline(raw):
             return datetime.strptime(raw, fmt).replace(tzinfo=st.TZ) + timedelta(minutes=1)
         except ValueError:
             pass
-    log.error("REG_DEADLINE noto‘g‘ri: %r (kutilgan ko‘rinish: 2026-09-27 23:59) — muddat qo‘yilmadi", raw)
+    log.error("REG_DEADLINE noto‘g‘ri: %r (kutilgan ko‘rinish: 2026-09-28 23:59) — muddat qo‘yilmadi", raw)
     return None
 
 
@@ -96,7 +96,7 @@ def _now():
 
 
 def deadline_label():
-    """«27-sentabr, 23:59»"""
+    """«28-sentabr, 23:59»"""
     d = DEADLINE_END - timedelta(minutes=1)
     return f"{d.day}-{UZ_MONTHS[d.month - 1]}, {d:%H:%M}"
 
@@ -219,9 +219,9 @@ ANNOUNCE = (
     "MVP shaklida bo‘lishi kerak\n"
     "\n"
     "🏆 <b>Mukofot jamg‘armasi:</b>\n"
-    "🥇 1-o‘rin — <b>60 mln so‘m</b>\n"
+    "🥇 1-o‘rin — <b>70 mln so‘m</b>\n"
     "🥈 2-o‘rin — <b>50 mln so‘m</b>\n"
-    "🥉 3-o‘rin — <b>40 mln so‘m</b>\n"
+    "🥉 3-o‘rin — <b>30 mln so‘m</b>\n"
     "\n"
     "📍 Xatirchi tumani, «Farovon» MFY, «IT-shaharcha» binosi\n"
     "\n"
