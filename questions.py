@@ -32,7 +32,7 @@ TEAM = "Jamoa shaklida"
 # Ro‘yxatga olishning oxirgi muddati (Toshkent vaqti; ko‘rsatilgan daqiqa ham kiradi).
 # Muddatni kodga tegmasdan o‘zgartirish: serverdagi .env ga REG_DEADLINE=2026-10-05 23:59
 # yozing va web-ilovani qayta yuklang. REG_DEADLINE=off - muddatsiz.
-REG_DEADLINE = "2026-09-27 23:59"
+REG_DEADLINE = "2026-09-28 23:59"
 
 QUESTIONS = [
     {
