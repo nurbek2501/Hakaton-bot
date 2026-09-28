@@ -73,7 +73,7 @@ SEND_LAG_GRACE = timedelta(minutes=2)
 
 
 def _parse_deadline(raw):
-    """«2026-09-30 23:59» yoki «30.09.2026 23:59» -> qabul yopiladigan payt (shu daqiqa oxiri).
+    """«2026-10-02 23:59» yoki «02.10.2026 23:59» -> qabul yopiladigan payt (shu daqiqa oxiri).
     «off» - muddatsiz. Noto‘g‘ri yozilgan bo‘lsa - log’da xato va muddatsiz ishlaydi."""
     raw = (raw or "").strip()
     if raw.lower() in ("off", "none", "0"):
@@ -96,7 +96,7 @@ def _now():
 
 
 def deadline_label():
-    """«30-sentabr, 23:59»"""
+    """«2-Oktabr, 23:59»"""
     d = DEADLINE_END - timedelta(minutes=1)
     return f"{d.day}-{UZ_MONTHS[d.month - 1]}, {d:%H:%M}"
 
